@@ -282,7 +282,8 @@ final class PojavControlOverlay extends ViewGroup {
                     if (downDeltaX * downDeltaX + downDeltaY * downDeltaY > threshold * threshold) {
                         cameraMoved = true;
                     }
-                    moveVirtualCursor(x - cameraX, y - cameraY);
+                    float speed = ControlSettings.cursorFactor(activity);
+                    moveVirtualCursor((x - cameraX) * speed, (y - cameraY) * speed);
                     cameraX = x;
                     cameraY = y;
                 }

@@ -462,6 +462,33 @@ final class PojavControlsEditorView extends FrameLayout {
         });
         form.addView(sensitivityBar);
 
+        int cursorCurrent = ControlSettings.cursorSpeedPercent(activity);
+        TextView cursorLabel = new TextView(activity);
+        cursorLabel.setText(activity.getString(R.string.pojav_controls_cursor_speed, cursorCurrent));
+        cursorLabel.setTextSize(16);
+        LinearLayout.LayoutParams cursorLabelParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cursorLabelParams.topMargin = Math.round(16 * density);
+        form.addView(cursorLabel, cursorLabelParams);
+
+        SeekBar cursorBar = new SeekBar(activity);
+        cursorBar.setMax(ControlSettings.CURSOR_MAX - ControlSettings.CURSOR_MIN);
+        cursorBar.setProgress(cursorCurrent - ControlSettings.CURSOR_MIN);
+        cursorBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                cursorLabel.setText(activity.getString(R.string.pojav_controls_cursor_speed,
+                        progress + ControlSettings.CURSOR_MIN));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        form.addView(cursorBar);
+
         CheckBox hideInMenu = new CheckBox(activity);
         hideInMenu.setText(R.string.pojav_controls_hide_in_menu);
         hideInMenu.setChecked(ControlSettings.hideInMenu(activity));
@@ -470,12 +497,17 @@ final class PojavControlsEditorView extends FrameLayout {
         hideParams.topMargin = Math.round(16 * density);
         form.addView(hideInMenu, hideParams);
 
+        ScrollView settingsScroll = new ScrollView(activity);
+        settingsScroll.addView(form);
+
         new AlertDialog.Builder(activity)
                 .setTitle(R.string.pojav_controls_settings)
-                .setView(form)
+                .setView(settingsScroll)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
                     ControlSettings.setSensitivityPercent(activity,
                             sensitivityBar.getProgress() + ControlSettings.SENS_MIN);
+                    ControlSettings.setCursorSpeedPercent(activity,
+                            cursorBar.getProgress() + ControlSettings.CURSOR_MIN);
                     ControlSettings.setHideInMenu(activity, hideInMenu.isChecked());
                     Toast.makeText(activity, R.string.pojav_controls_saved, Toast.LENGTH_SHORT).show();
                 })
