@@ -20,6 +20,9 @@
     <string name="pojav_controls_mapping">Key mapping</string>
     <string name="pojav_controls_mapping_max">Maximum 4 keys per button</string>
     <string name="pojav_controls_clear">Clear</string>
+    <string name="pojav_controls_settings">Settings</string>
+    <string name="pojav_controls_sensitivity">Camera sensitivity: %1$d%%</string>
+    <string name="pojav_controls_hide_in_menu">Hide controls while a menu is open (inventory, settings)</string>
     <string name="pojav_controls_position_x">X expression</string>
     <string name="pojav_controls_position_y">Y expression</string>
     <string name="pojav_controls_width">Width (dp)</string>
