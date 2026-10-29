@@ -26,6 +26,7 @@ import java.util.Map;
 final class PojavControlOverlay extends ViewGroup {
     private final Activity activity;
     private final PojavControlsHost host;
+    private final RefCountedHost refHost;
     private final ControlRepository repository;
     private final RuntimeSurface runtimeSurface;
     private final VirtualMouseCursor cursorView;
@@ -52,7 +53,8 @@ final class PojavControlOverlay extends ViewGroup {
     PojavControlOverlay(Activity activity, PojavControlsHost host) {
         super(activity);
         this.activity = activity;
-        this.host = host;
+        refHost = new RefCountedHost(host);
+        this.host = refHost;
         repository = new ControlRepository(activity);
         runtimeSurface = new RuntimeSurface(activity);
         cursorView = new VirtualMouseCursor(activity);
@@ -93,6 +95,7 @@ final class PojavControlOverlay extends ViewGroup {
         for (RuntimeJoystick joystick : joysticks) joystick.release();
         runtimeSurface.release();
         releaseVirtualTouch();
+        refHost.releaseStuckKeys();
     }
 
     void dispose() {
@@ -689,8 +692,19 @@ final class PojavControlOverlay extends ViewGroup {
             setActivated(pressed || virtualMouseActive);
         }
 
+        // Satu tombol layar bisa menggerakkan beberapa tombol sekaligus:
+        // ditekan berurutan, dilepas dengan urutan terbalik.
         private void send(boolean down) {
-            int code = data.primaryKeycode();
+            int[] codes = data.keycodes;
+            if (codes == null) return;
+            if (down) {
+                for (int i = 0; i < codes.length; i++) sendCode(codes[i], true);
+            } else {
+                for (int i = codes.length - 1; i >= 0; i--) sendCode(codes[i], false);
+            }
+        }
+
+        private void sendCode(int code, boolean down) {
             if (code < 0) specialHandler.handle(code, down);
             else if (code != KeyMapper.GLFW_KEY_UNKNOWN) {
                 int bedrockCode = KeyMapper.toBedrock(code);

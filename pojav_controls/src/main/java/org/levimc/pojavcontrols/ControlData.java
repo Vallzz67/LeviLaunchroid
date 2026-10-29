@@ -16,6 +16,9 @@ public class ControlData {
     public static final int SPECIALBTN_SCROLLDOWN = -8;
     public static final int SPECIALBTN_MENU = -9;
 
+    /** Jumlah maksimum tombol keyboard yang bisa digabung dalam satu tombol layar. */
+    public static final int MAX_KEYCODES = 4;
+
     public transient boolean isHideable;
     public String dynamicX;
     public String dynamicY;
@@ -88,17 +91,30 @@ public class ControlData {
         cornerRadius = Math.max(0f, Math.min(cornerRadius, 100f));
     }
 
+    // Mengumpulkan sampai MAX_KEYCODES tombol keyboard (urutan dipertahankan, duplikat dibuang).
+    // Tombol spesial (kode negatif, mis. mouse/keyboard/menu) tidak bisa digabung:
+    // kalau tombol spesial muncul lebih dulu, hanya itu yang dipakai.
     private static int[] inflateKeycodes(int[] source) {
-        int[] result = new int[]{KeyMapper.GLFW_KEY_UNKNOWN};
+        int[] collected = new int[MAX_KEYCODES];
+        int count = 0;
         if (source != null) {
             for (int code : source) {
-                if (code != KeyMapper.GLFW_KEY_UNKNOWN) {
-                    result[0] = code;
-                    break;
+                if (code == KeyMapper.GLFW_KEY_UNKNOWN) continue;
+                if (code < 0) {
+                    if (count == 0) return new int[]{code};
+                    continue;
                 }
+                boolean duplicate = false;
+                for (int i = 0; i < count; i++) {
+                    if (collected[i] == code) { duplicate = true; break; }
+                }
+                if (duplicate) continue;
+                collected[count++] = code;
+                if (count == MAX_KEYCODES) break;
             }
         }
-        return result;
+        if (count == 0) return new int[]{KeyMapper.GLFW_KEY_UNKNOWN};
+        return Arrays.copyOf(collected, count);
     }
 
     public int primaryKeycode() {

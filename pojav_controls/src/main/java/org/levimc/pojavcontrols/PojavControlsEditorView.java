@@ -269,7 +269,7 @@ final class PojavControlsEditorView extends FrameLayout {
         Button mapping = new Button(activity);
         mapping.setText(mappingText(target.data.keycodes));
         mapping.setAllCaps(false);
-        int[] selectedCodes = Arrays.copyOf(target.data.keycodes, 1);
+        int[] selectedCodes = Arrays.copyOf(target.data.keycodes, ControlData.MAX_KEYCODES);
         if (target.type == ControlEditorCanvas.EditorTarget.BUTTON ||
                 target.type == ControlEditorCanvas.EditorTarget.DRAWER_BUTTON) {
             addLabel(form, R.string.pojav_controls_mapping);
@@ -343,7 +343,7 @@ final class PojavControlsEditorView extends FrameLayout {
                 .setView(scroll)
                 .setPositiveButton(android.R.string.ok, (ignored, which) -> {
                     target.data.name = name.getText().toString().trim();
-                    target.data.keycodes = Arrays.copyOf(selectedCodes, 1);
+                    target.data.keycodes = selectedCodes.clone();
                     target.data.dynamicX = x.getText().toString().trim();
                     target.data.dynamicY = y.getText().toString().trim();
                     target.data.width = number(width, target.data.width);
@@ -383,19 +383,67 @@ final class PojavControlsEditorView extends FrameLayout {
     }
 
     private void showMappingDialog(int[] selectedCodes, Button mapping) {
-        List<KeyMapper.Entry> entries = KeyMapper.entries();
-        String[] names = new String[entries.size()];
-        int selected = 0;
-        for (int i = 0; i < entries.size(); i++) {
-            names[i] = entries.get(i).name;
-            if (selectedCodes.length > 0 && selectedCodes[0] == entries.get(i).glfwCode) selected = i;
+        List<KeyMapper.Entry> choices = new ArrayList<>();
+        for (KeyMapper.Entry entry : KeyMapper.entries()) {
+            if (entry.glfwCode != KeyMapper.GLFW_KEY_UNKNOWN) choices.add(entry);
         }
-        int[] selectedIndex = new int[]{selected};
+        ArrayList<Integer> order = new ArrayList<>();
+        for (int code : selectedCodes) {
+            if (code != KeyMapper.GLFW_KEY_UNKNOWN && !order.contains(code)) order.add(code);
+        }
+        String[] names = new String[choices.size()];
+        boolean[] checked = new boolean[choices.size()];
+        for (int i = 0; i < choices.size(); i++) {
+            names[i] = choices.get(i).name;
+            checked[i] = order.contains(choices.get(i).glfwCode);
+        }
         new AlertDialog.Builder(activity)
                 .setTitle(R.string.pojav_controls_mapping)
-                .setSingleChoiceItems(names, selected, (dialog, which) -> selectedIndex[0] = which)
+                .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> {
+                    int code = choices.get(which).glfwCode;
+                    android.widget.ListView list = ((AlertDialog) dialog).getListView();
+                    if (!isChecked) {
+                        order.remove(Integer.valueOf(code));
+                        return;
+                    }
+                    if (code < 0) {
+                        // Tombol spesial berdiri sendiri: lepas semua pilihan lain.
+                        for (int i = 0; i < checked.length; i++) {
+                            if (i != which && checked[i]) {
+                                checked[i] = false;
+                                list.setItemChecked(i, false);
+                            }
+                        }
+                        order.clear();
+                        order.add(code);
+                        return;
+                    }
+                    // Tombol keyboard: lepas tombol spesial kalau ada.
+                    for (int i = 0; i < choices.size(); i++) {
+                        if (choices.get(i).glfwCode < 0 && checked[i]) {
+                            checked[i] = false;
+                            list.setItemChecked(i, false);
+                            order.remove(Integer.valueOf(choices.get(i).glfwCode));
+                        }
+                    }
+                    if (order.size() >= ControlData.MAX_KEYCODES) {
+                        checked[which] = false;
+                        list.setItemChecked(which, false);
+                        Toast.makeText(activity, R.string.pojav_controls_mapping_max,
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    order.add(code);
+                })
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
-                    selectedCodes[0] = entries.get(selectedIndex[0]).glfwCode;
+                    Arrays.fill(selectedCodes, KeyMapper.GLFW_KEY_UNKNOWN);
+                    for (int i = 0; i < order.size() && i < selectedCodes.length; i++) {
+                        selectedCodes[i] = order.get(i);
+                    }
+                    mapping.setText(mappingText(selectedCodes));
+                })
+                .setNeutralButton(R.string.pojav_controls_clear, (dialog, which) -> {
+                    Arrays.fill(selectedCodes, KeyMapper.GLFW_KEY_UNKNOWN);
                     mapping.setText(mappingText(selectedCodes));
                 })
                 .setNegativeButton(android.R.string.cancel, null)
@@ -403,10 +451,16 @@ final class PojavControlsEditorView extends FrameLayout {
     }
 
     private String mappingText(int[] keycodes) {
-        int code = keycodes == null || keycodes.length == 0
-                ? KeyMapper.GLFW_KEY_UNKNOWN : keycodes[0];
-        return code == KeyMapper.GLFW_KEY_UNKNOWN
-                ? activity.getString(R.string.pojav_controls_mapping) : KeyMapper.nameOf(code);
+        StringBuilder text = new StringBuilder();
+        if (keycodes != null) {
+            for (int code : keycodes) {
+                if (code == KeyMapper.GLFW_KEY_UNKNOWN) continue;
+                if (text.length() > 0) text.append(" + ");
+                text.append(KeyMapper.nameOf(code));
+            }
+        }
+        return text.length() == 0
+                ? activity.getString(R.string.pojav_controls_mapping) : text.toString();
     }
 
     private EditText field(LinearLayout form, int label, String value) {
