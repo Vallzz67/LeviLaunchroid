@@ -91,19 +91,14 @@ public class ControlData {
         cornerRadius = Math.max(0f, Math.min(cornerRadius, 100f));
     }
 
-    // Mengumpulkan sampai MAX_KEYCODES tombol keyboard (urutan dipertahankan, duplikat dibuang).
-    // Tombol spesial (kode negatif, mis. mouse/keyboard/menu) tidak bisa digabung:
-    // kalau tombol spesial muncul lebih dulu, hanya itu yang dipakai.
+    // Mengumpulkan sampai MAX_KEYCODES tombol (urutan dipertahankan, duplikat dibuang).
+    // Tombol spesial (klik mouse, scroll, dll.) boleh digabung dengan tombol keyboard.
     private static int[] inflateKeycodes(int[] source) {
         int[] collected = new int[MAX_KEYCODES];
         int count = 0;
         if (source != null) {
             for (int code : source) {
                 if (code == KeyMapper.GLFW_KEY_UNKNOWN) continue;
-                if (code < 0) {
-                    if (count == 0) return new int[]{code};
-                    continue;
-                }
                 boolean duplicate = false;
                 for (int i = 0; i < count; i++) {
                     if (collected[i] == code) { duplicate = true; break; }

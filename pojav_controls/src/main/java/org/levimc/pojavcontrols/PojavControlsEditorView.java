@@ -14,6 +14,7 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -98,6 +99,7 @@ final class PojavControlsEditorView extends FrameLayout {
         Button hide = toolbarButton(R.string.pojav_controls_hide_toolbar, null);
         toolbar.addView(hide);
         toolbar.addView(toolbarButton(R.string.pojav_controls_add, view -> showAddDialog()));
+        toolbar.addView(toolbarButton(R.string.pojav_controls_settings, view -> showSettingsDialog()));
         toolbar.addView(toolbarButton(R.string.pojav_controls_save, view -> saveCurrent(true)));
         toolbar.addView(toolbarButton(R.string.pojav_controls_import, view -> startImport()));
         toolbar.addView(toolbarButton(R.string.pojav_controls_export, view -> startExport()));
@@ -401,34 +403,13 @@ final class PojavControlsEditorView extends FrameLayout {
                 .setTitle(R.string.pojav_controls_mapping)
                 .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> {
                     int code = choices.get(which).glfwCode;
-                    android.widget.ListView list = ((AlertDialog) dialog).getListView();
                     if (!isChecked) {
                         order.remove(Integer.valueOf(code));
                         return;
                     }
-                    if (code < 0) {
-                        // Tombol spesial berdiri sendiri: lepas semua pilihan lain.
-                        for (int i = 0; i < checked.length; i++) {
-                            if (i != which && checked[i]) {
-                                checked[i] = false;
-                                list.setItemChecked(i, false);
-                            }
-                        }
-                        order.clear();
-                        order.add(code);
-                        return;
-                    }
-                    // Tombol keyboard: lepas tombol spesial kalau ada.
-                    for (int i = 0; i < choices.size(); i++) {
-                        if (choices.get(i).glfwCode < 0 && checked[i]) {
-                            checked[i] = false;
-                            list.setItemChecked(i, false);
-                            order.remove(Integer.valueOf(choices.get(i).glfwCode));
-                        }
-                    }
                     if (order.size() >= ControlData.MAX_KEYCODES) {
                         checked[which] = false;
-                        list.setItemChecked(which, false);
+                        ((AlertDialog) dialog).getListView().setItemChecked(which, false);
                         Toast.makeText(activity, R.string.pojav_controls_mapping_max,
                                 Toast.LENGTH_SHORT).show();
                         return;
@@ -445,6 +426,58 @@ final class PojavControlsEditorView extends FrameLayout {
                 .setNeutralButton(R.string.pojav_controls_clear, (dialog, which) -> {
                     Arrays.fill(selectedCodes, KeyMapper.GLFW_KEY_UNKNOWN);
                     mapping.setText(mappingText(selectedCodes));
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showSettingsDialog() {
+        float density = getResources().getDisplayMetrics().density;
+        LinearLayout form = new LinearLayout(activity);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int pad = Math.round(20 * density);
+        form.setPadding(pad, pad, pad, 0);
+
+        int current = ControlSettings.sensitivityPercent(activity);
+        TextView sensitivityLabel = new TextView(activity);
+        sensitivityLabel.setText(activity.getString(R.string.pojav_controls_sensitivity, current));
+        sensitivityLabel.setTextSize(16);
+        form.addView(sensitivityLabel);
+
+        SeekBar sensitivityBar = new SeekBar(activity);
+        sensitivityBar.setMax(ControlSettings.SENS_MAX - ControlSettings.SENS_MIN);
+        sensitivityBar.setProgress(current - ControlSettings.SENS_MIN);
+        sensitivityBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                sensitivityLabel.setText(activity.getString(R.string.pojav_controls_sensitivity,
+                        progress + ControlSettings.SENS_MIN));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        form.addView(sensitivityBar);
+
+        CheckBox hideInMenu = new CheckBox(activity);
+        hideInMenu.setText(R.string.pojav_controls_hide_in_menu);
+        hideInMenu.setChecked(ControlSettings.hideInMenu(activity));
+        LinearLayout.LayoutParams hideParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        hideParams.topMargin = Math.round(16 * density);
+        form.addView(hideInMenu, hideParams);
+
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.pojav_controls_settings)
+                .setView(form)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    ControlSettings.setSensitivityPercent(activity,
+                            sensitivityBar.getProgress() + ControlSettings.SENS_MIN);
+                    ControlSettings.setHideInMenu(activity, hideInMenu.isChecked());
+                    Toast.makeText(activity, R.string.pojav_controls_saved, Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();

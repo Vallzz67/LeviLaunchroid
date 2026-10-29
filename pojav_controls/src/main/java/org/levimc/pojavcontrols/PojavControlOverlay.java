@@ -179,7 +179,18 @@ final class PojavControlOverlay extends ViewGroup {
 
     private float cameraSensitivity() {
         int height = getResources().getDisplayMetrics().heightPixels;
-        return height > 0 ? 1.4f * 1080f / height : 1.4f;
+        float base = height > 0 ? 1.4f * 1080f / height : 1.4f;
+        return base * ControlSettings.sensitivityFactor(activity);
+    }
+
+    private boolean hideControlsInMenu() {
+        return ControlSettings.hideInMenu(activity);
+    }
+
+    // Saat menu/inventory terbuka dan opsi "sembunyikan kontrol di menu" aktif,
+    // sentuhan langsung diteruskan ke game (kursor virtual dimatikan sementara).
+    private boolean isMenuDirect() {
+        return hideControlsInMenu() && host.pojavIsMenuOpen();
     }
 
     private void setVirtualMouse(boolean enabled) {
@@ -211,6 +222,10 @@ final class PojavControlOverlay extends ViewGroup {
         int y = Math.round(virtualCursorY);
         cursorView.layout(x, y, x + cursorView.getMeasuredWidth(), y + cursorView.getMeasuredHeight());
         cursorView.invalidate();
+        // Saat jari "menahan klik" kursor virtual, kirim gerakan supaya item bisa digeser (drag).
+        if (virtualTouchDown) {
+            sendVirtualTouch(MotionEvent.ACTION_MOVE, virtualTouchDownAt, SystemClock.uptimeMillis());
+        }
     }
 
     private void clampVirtualCursor() {
@@ -241,7 +256,7 @@ final class PojavControlOverlay extends ViewGroup {
         public boolean onTouchEvent(MotionEvent event) {
             int action = event.getActionMasked();
             int actionIndex = event.getActionIndex();
-            if (!virtualMouse) {
+            if (!virtualMouse || isMenuDirect()) {
                 return handleGameplayTouch(event);
             }
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
@@ -346,9 +361,14 @@ final class PojavControlOverlay extends ViewGroup {
         }
     }
 
+    // Ketukan kursor virtual: DOWN lalu UP dengan jeda singkat, supaya game sempat memprosesnya.
     private void sendVirtualTouchTap(long eventTime) {
-        sendVirtualTouch(MotionEvent.ACTION_DOWN, eventTime, eventTime);
-        sendVirtualTouch(MotionEvent.ACTION_UP, eventTime, eventTime + 10L);
+        final long downAt = SystemClock.uptimeMillis();
+        final float x = virtualCursorX;
+        final float y = virtualCursorY;
+        sendVirtualTouchAt(MotionEvent.ACTION_DOWN, downAt, downAt, x, y);
+        postDelayed(() -> sendVirtualTouchAt(MotionEvent.ACTION_UP, downAt,
+                SystemClock.uptimeMillis(), x, y), 45L);
     }
 
     private void setVirtualTouchPressed(boolean down) {
@@ -371,8 +391,11 @@ final class PojavControlOverlay extends ViewGroup {
     }
 
     private void sendVirtualTouch(int action, long downTime, long eventTime) {
-        MotionEvent event = MotionEvent.obtain(downTime, eventTime, action,
-                virtualCursorX, virtualCursorY, 0);
+        sendVirtualTouchAt(action, downTime, eventTime, virtualCursorX, virtualCursorY);
+    }
+
+    private void sendVirtualTouchAt(int action, long downTime, long eventTime, float x, float y) {
+        MotionEvent event = MotionEvent.obtain(downTime, eventTime, action, x, y, 0);
         event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
         host.pojavSendTouch(event);
         event.recycle();
@@ -429,18 +452,23 @@ final class PojavControlOverlay extends ViewGroup {
 
     private void updateVisibility() {
         boolean menu = host.pojavIsMenuOpen();
+        boolean hideAll = menu && hideControlsInMenu();
         for (RuntimeButton button : buttons) {
             boolean specialToggle = button.data.keycodes[0] == ControlData.SPECIALBTN_TOGGLECTRL;
-            boolean visible = specialToggle || (controlsVisible && button.isVisibleForMode(menu));
+            boolean visible = !hideAll
+                    && (specialToggle || (controlsVisible && button.isVisibleForMode(menu)));
             DrawerPlacement placement = drawerPlacements.get(button);
             if (placement != null) visible &= placement.runtime.open;
+            // Tombol yang sedang ditahan lalu disembunyikan harus dilepas, supaya tombol game tidak nyangkut.
+            if (!visible && button.getVisibility() == VISIBLE && !button.data.isToggle) button.release();
             button.setVisibility(visible ? VISIBLE : GONE);
         }
         for (RuntimeJoystick joystick : joysticks) {
-            boolean visible = controlsVisible && joystick.isVisibleForMode(menu);
+            boolean visible = !hideAll && controlsVisible && joystick.isVisibleForMode(menu);
             joystick.setVisibility(visible ? VISIBLE : GONE);
             if (!visible) joystick.release();
         }
+        cursorView.setVisibility(virtualMouse && !hideAll ? VISIBLE : GONE);
     }
 
     private void layoutDrawerChild(View child, DrawerPlacement placement, int screenWidth, int screenHeight) {
@@ -669,7 +697,8 @@ final class PojavControlOverlay extends ViewGroup {
 
         private float cameraSensitivity() {
             int height = getResources().getDisplayMetrics().heightPixels;
-            return height > 0 ? 1.4f * 1080f / height : 1.4f;
+            float base = height > 0 ? 1.4f * 1080f / height : 1.4f;
+            return base * ControlSettings.sensitivityFactor(getContext());
         }
 
         private void sendTouchToGame(MotionEvent event) {
