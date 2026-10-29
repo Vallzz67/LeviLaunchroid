@@ -13,6 +13,16 @@ jobs:
           fetch-depth: 0
           submodules: "recursive"
 
+      - name: Pakai kunci tanda tangan tetap (supaya update bisa menimpa versi sebelumnya)
+        run: |
+          mkdir -p ~/.android
+          if [ -f ci-debug.keystore ]; then
+            cp ci-debug.keystore ~/.android/debug.keystore
+            echo "Memakai ci-debug.keystore"
+          else
+            echo "ci-debug.keystore tidak ada; memakai kunci acak"
+          fi
+
       - name: Placeholder google-services.json
         run: |
           mkdir -p app
