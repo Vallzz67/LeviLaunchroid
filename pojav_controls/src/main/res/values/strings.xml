@@ -18,6 +18,8 @@
     <string name="pojav_controls_properties">Control properties</string>
     <string name="pojav_controls_name">Name</string>
     <string name="pojav_controls_mapping">Key mapping</string>
+    <string name="pojav_controls_mapping_max">Maximum 4 keys per button</string>
+    <string name="pojav_controls_clear">Clear</string>
     <string name="pojav_controls_position_x">X expression</string>
     <string name="pojav_controls_position_y">Y expression</string>
     <string name="pojav_controls_width">Width (dp)</string>
