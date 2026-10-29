@@ -462,8 +462,41 @@ class MinecraftActivity : MainActivity(), PojavControlsHost {
         PojavControlsMod.nativeSendPointer(x, y)
     }
 
+    // Sentuhan di menu/inventory dikirim langsung ke SurfaceView game (jalur yang sama dengan
+    // sentuhan biasa), bukan lewat Activity.onTouchEvent yang tidak diteruskan ke game.
+    private var gameInputView: View? = null
+
     override fun pojavSendTouch(event: MotionEvent): Boolean {
+        val target = findGameInputView() ?: return super.onTouchEvent(event)
+        val copy = MotionEvent.obtain(event)
+        try {
+            val location = IntArray(2)
+            target.getLocationInWindow(location)
+            copy.offsetLocation(-location[0].toFloat(), -location[1].toFloat())
+            if (target.dispatchTouchEvent(copy)) return true
+        } finally {
+            copy.recycle()
+        }
         return super.onTouchEvent(event)
+    }
+
+    private fun findGameInputView(): View? {
+        val cached = gameInputView
+        if (cached != null && cached.isAttachedToWindow) return cached
+        val found = findSurfaceView(window.decorView)
+        gameInputView = found
+        return found
+    }
+
+    private fun findSurfaceView(view: View): View? {
+        if (view is android.view.SurfaceView) return view
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val result = findSurfaceView(view.getChildAt(i))
+                if (result != null) return result
+            }
+        }
+        return null
     }
 
     override fun pojavShowKeyboard() {
