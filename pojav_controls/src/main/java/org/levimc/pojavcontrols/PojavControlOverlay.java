@@ -123,7 +123,7 @@ final class PojavControlOverlay extends ViewGroup {
                 continue;
             }
             if (child == cursorView) {
-                int cursorSize = Math.round(36 * density);
+                int cursorSize = Math.round(20 * density);
                 child.measure(MeasureSpec.makeMeasureSpec(cursorSize, MeasureSpec.EXACTLY),
                         MeasureSpec.makeMeasureSpec(cursorSize, MeasureSpec.EXACTLY));
                 continue;
@@ -570,7 +570,8 @@ final class PojavControlOverlay extends ViewGroup {
 
         @Override
         protected void onDraw(Canvas canvas) {
-            float density = getResources().getDisplayMetrics().density;
+            // Panah digambar dalam satuan dp lalu diperkecil (ukuran mirip kursor Zalith).
+            float density = getResources().getDisplayMetrics().density * 0.55f;
             pointer.reset();
             pointer.moveTo(2f * density, 2f * density);
             pointer.lineTo(2f * density, 29f * density);
