@@ -431,6 +431,36 @@ final class PojavControlsEditorView extends FrameLayout {
                 .show();
     }
 
+    private SeekBar addSlider(LinearLayout form, int labelRes, int min, int max, int current,
+                              boolean first) {
+        float density = getResources().getDisplayMetrics().density;
+        TextView label = new TextView(activity);
+        label.setText(activity.getString(labelRes, current));
+        label.setTextSize(16);
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        if (!first) labelParams.topMargin = Math.round(16 * density);
+        form.addView(label, labelParams);
+
+        SeekBar bar = new SeekBar(activity);
+        bar.setMax(max - min);
+        bar.setProgress(current - min);
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                label.setText(activity.getString(labelRes, progress + min));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        form.addView(bar);
+        return bar;
+    }
+
     private void showSettingsDialog() {
         float density = getResources().getDisplayMetrics().density;
         LinearLayout form = new LinearLayout(activity);
@@ -438,56 +468,18 @@ final class PojavControlsEditorView extends FrameLayout {
         int pad = Math.round(20 * density);
         form.setPadding(pad, pad, pad, 0);
 
-        int current = ControlSettings.sensitivityPercent(activity);
-        TextView sensitivityLabel = new TextView(activity);
-        sensitivityLabel.setText(activity.getString(R.string.pojav_controls_sensitivity, current));
-        sensitivityLabel.setTextSize(16);
-        form.addView(sensitivityLabel);
-
-        SeekBar sensitivityBar = new SeekBar(activity);
-        sensitivityBar.setMax(ControlSettings.SENS_MAX - ControlSettings.SENS_MIN);
-        sensitivityBar.setProgress(current - ControlSettings.SENS_MIN);
-        sensitivityBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                sensitivityLabel.setText(activity.getString(R.string.pojav_controls_sensitivity,
-                        progress + ControlSettings.SENS_MIN));
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {}
-
-            @Override
-            public void onStopTrackingTouch(SeekBar bar) {}
-        });
-        form.addView(sensitivityBar);
-
-        int cursorCurrent = ControlSettings.cursorSpeedPercent(activity);
-        TextView cursorLabel = new TextView(activity);
-        cursorLabel.setText(activity.getString(R.string.pojav_controls_cursor_speed, cursorCurrent));
-        cursorLabel.setTextSize(16);
-        LinearLayout.LayoutParams cursorLabelParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        cursorLabelParams.topMargin = Math.round(16 * density);
-        form.addView(cursorLabel, cursorLabelParams);
-
-        SeekBar cursorBar = new SeekBar(activity);
-        cursorBar.setMax(ControlSettings.CURSOR_MAX - ControlSettings.CURSOR_MIN);
-        cursorBar.setProgress(cursorCurrent - ControlSettings.CURSOR_MIN);
-        cursorBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                cursorLabel.setText(activity.getString(R.string.pojav_controls_cursor_speed,
-                        progress + ControlSettings.CURSOR_MIN));
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {}
-
-            @Override
-            public void onStopTrackingTouch(SeekBar bar) {}
-        });
-        form.addView(cursorBar);
+        SeekBar sensitivityBar = addSlider(form, R.string.pojav_controls_sensitivity,
+                ControlSettings.SENS_MIN, ControlSettings.SENS_MAX,
+                ControlSettings.sensitivityPercent(activity), true);
+        SeekBar cursorSpeedBar = addSlider(form, R.string.pojav_controls_cursor_speed,
+                ControlSettings.CURSOR_MIN, ControlSettings.CURSOR_MAX,
+                ControlSettings.cursorSpeedPercent(activity), false);
+        SeekBar cursorSizeBar = addSlider(form, R.string.pojav_controls_cursor_size,
+                ControlSettings.CURSOR_SIZE_MIN, ControlSettings.CURSOR_SIZE_MAX,
+                ControlSettings.cursorSizePercent(activity), false);
+        SeekBar comboDelayBar = addSlider(form, R.string.pojav_controls_combo_delay,
+                ControlSettings.COMBO_DELAY_MIN, ControlSettings.COMBO_DELAY_MAX,
+                ControlSettings.comboDelayMs(activity), false);
 
         CheckBox hideInMenu = new CheckBox(activity);
         hideInMenu.setText(R.string.pojav_controls_hide_in_menu);
@@ -496,6 +488,11 @@ final class PojavControlsEditorView extends FrameLayout {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         hideParams.topMargin = Math.round(16 * density);
         form.addView(hideInMenu, hideParams);
+
+        CheckBox cursorInMenus = new CheckBox(activity);
+        cursorInMenus.setText(R.string.pojav_controls_cursor_in_menus);
+        cursorInMenus.setChecked(ControlSettings.cursorInMenus(activity));
+        form.addView(cursorInMenus);
 
         ScrollView settingsScroll = new ScrollView(activity);
         settingsScroll.addView(form);
@@ -507,8 +504,13 @@ final class PojavControlsEditorView extends FrameLayout {
                     ControlSettings.setSensitivityPercent(activity,
                             sensitivityBar.getProgress() + ControlSettings.SENS_MIN);
                     ControlSettings.setCursorSpeedPercent(activity,
-                            cursorBar.getProgress() + ControlSettings.CURSOR_MIN);
+                            cursorSpeedBar.getProgress() + ControlSettings.CURSOR_MIN);
+                    ControlSettings.setCursorSizePercent(activity,
+                            cursorSizeBar.getProgress() + ControlSettings.CURSOR_SIZE_MIN);
+                    ControlSettings.setComboDelayMs(activity,
+                            comboDelayBar.getProgress() + ControlSettings.COMBO_DELAY_MIN);
                     ControlSettings.setHideInMenu(activity, hideInMenu.isChecked());
+                    ControlSettings.setCursorInMenus(activity, cursorInMenus.isChecked());
                     Toast.makeText(activity, R.string.pojav_controls_saved, Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton(android.R.string.cancel, null)

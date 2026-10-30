@@ -11,6 +11,8 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -42,6 +44,7 @@ final class PojavControlOverlay extends ViewGroup {
     private boolean virtualTouchDown;
     private long virtualTouchDownAt;
     private boolean receiverRegistered;
+    private float appliedCursorScale = -1f;
 
     private final BroadcastReceiver profileReceiver = new BroadcastReceiver() {
         @Override
@@ -84,7 +87,7 @@ final class PojavControlOverlay extends ViewGroup {
         }
         for (ControlDrawerData data : profile.mDrawerDataList) addDrawer(data);
         addView(cursorView);
-        cursorView.setVisibility(virtualMouse ? VISIBLE : GONE);
+        cursorView.setVisibility(GONE);
         updateVirtualMouseButtons();
         requestLayout();
         invalidate();
@@ -123,7 +126,10 @@ final class PojavControlOverlay extends ViewGroup {
                 continue;
             }
             if (child == cursorView) {
-                int cursorSize = Math.round(20 * density);
+                float cursorScale = ControlSettings.cursorSizeFactor(activity);
+                appliedCursorScale = cursorScale;
+                cursorView.setCursorScale(cursorScale);
+                int cursorSize = Math.max(1, Math.round(36 * density * cursorScale));
                 child.measure(MeasureSpec.makeMeasureSpec(cursorSize, MeasureSpec.EXACTLY),
                         MeasureSpec.makeMeasureSpec(cursorSize, MeasureSpec.EXACTLY));
                 continue;
@@ -187,10 +193,11 @@ final class PojavControlOverlay extends ViewGroup {
         return ControlSettings.hideInMenu(activity);
     }
 
-    // Saat menu/inventory terbuka dan opsi "sembunyikan kontrol di menu" aktif,
-    // sentuhan langsung diteruskan ke game (kursor virtual dimatikan sementara).
-    private boolean isMenuDirect() {
-        return hideControlsInMenu() && host.pojavIsMenuOpen();
+    // Kursor virtual HANYA aktif saat menu/inventory/pengaturan terbuka, dan tidak pernah
+    // di dalam game. Aktif kalau opsi "kursor di menu" menyala atau mode kursor dinyalakan tombol.
+    private boolean isCursorActive() {
+        return host.pojavIsMenuOpen()
+                && (virtualMouse || ControlSettings.cursorInMenus(activity));
     }
 
     private void setVirtualMouse(boolean enabled) {
@@ -205,7 +212,7 @@ final class PojavControlOverlay extends ViewGroup {
             }
             clampVirtualCursor();
         }
-        cursorView.setVisibility(enabled ? VISIBLE : GONE);
+        updateVisibility();
         updateVirtualMouseButtons();
         requestLayout();
     }
@@ -246,6 +253,7 @@ final class PojavControlOverlay extends ViewGroup {
         private long cameraDownAt;
         private boolean cameraMoved;
         private boolean menuGesture;
+        private boolean cursorGesture;
 
         RuntimeSurface(Context context) {
             super(context);
@@ -256,7 +264,10 @@ final class PojavControlOverlay extends ViewGroup {
         public boolean onTouchEvent(MotionEvent event) {
             int action = event.getActionMasked();
             int actionIndex = event.getActionIndex();
-            if (!virtualMouse || isMenuDirect()) {
+            // Mode (kursor/biasa) dikunci saat jari pertama menyentuh, supaya kalau menu tertutup
+            // di tengah gerakan, sisa sentuhan itu tidak "bocor" ke dalam game.
+            if (action == MotionEvent.ACTION_DOWN) cursorGesture = isCursorActive();
+            if (!cursorGesture) {
                 return handleGameplayTouch(event);
             }
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
@@ -434,10 +445,10 @@ final class PojavControlOverlay extends ViewGroup {
             controlsVisible = !controlsVisible;
             updateVisibility();
         } else if (code == ControlData.SPECIALBTN_VIRTUALMOUSE && down) setVirtualMouse(!virtualMouse);
-        else if (code == ControlData.SPECIALBTN_MOUSEPRI && virtualMouse) {
+        else if (code == ControlData.SPECIALBTN_MOUSEPRI && isCursorActive()) {
             setVirtualTouchPressed(down);
         }
-        else if (code == ControlData.SPECIALBTN_MOUSESEC && virtualMouse) {
+        else if (code == ControlData.SPECIALBTN_MOUSESEC && isCursorActive()) {
             setVirtualTouchPressed(down);
         }
         else if (code == ControlData.SPECIALBTN_MOUSEPRI) host.pojavSendMouseButton(MotionEvent.BUTTON_PRIMARY, down);
@@ -469,7 +480,11 @@ final class PojavControlOverlay extends ViewGroup {
             joystick.setVisibility(visible ? VISIBLE : GONE);
             if (!visible) joystick.release();
         }
-        cursorView.setVisibility(virtualMouse && !hideAll ? VISIBLE : GONE);
+        boolean cursorActive = menu && (virtualMouse || ControlSettings.cursorInMenus(activity));
+        // Keluar dari menu saat kursor sedang "menahan klik": lepas supaya tidak nyangkut.
+        if (!cursorActive && virtualTouchDown) releaseVirtualTouch();
+        cursorView.setVisibility(cursorActive ? VISIBLE : GONE);
+        if (ControlSettings.cursorSizeFactor(activity) != appliedCursorScale) requestLayout();
     }
 
     private void layoutDrawerChild(View child, DrawerPlacement placement, int screenWidth, int screenHeight) {
@@ -556,6 +571,7 @@ final class PojavControlOverlay extends ViewGroup {
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint outline = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path pointer = new Path();
+        private float scale = 1f;
 
         VirtualMouseCursor(Context context) {
             super(context);
@@ -569,10 +585,16 @@ final class PojavControlOverlay extends ViewGroup {
             setFocusable(false);
         }
 
+        void setCursorScale(float newScale) {
+            if (newScale == scale) return;
+            scale = newScale;
+            invalidate();
+        }
+
         @Override
         protected void onDraw(Canvas canvas) {
-            // Panah digambar dalam satuan dp lalu diperkecil (ukuran mirip kursor Zalith).
-            float density = getResources().getDisplayMetrics().density * 0.55f;
+            // Panah digambar dalam satuan dp, lalu diskalakan sesuai pengaturan ukuran kursor.
+            float density = getResources().getDisplayMetrics().density * scale;
             pointer.reset();
             pointer.moveTo(2f * density, 2f * density);
             pointer.lineTo(2f * density, 29f * density);
@@ -599,6 +621,10 @@ final class PojavControlOverlay extends ViewGroup {
         private boolean virtualMouseActive;
         private float passThroughX;
         private float passThroughY;
+        private final Handler comboHandler = new Handler(Looper.getMainLooper());
+        private final Object comboToken = new Object();
+        private long comboPressStart;
+        private boolean comboPending;
 
         RuntimeButton(Context context, ControlData data, PojavControlsHost host,
                       SpecialActionHandler specialHandler) {
@@ -680,7 +706,10 @@ final class PojavControlOverlay extends ViewGroup {
         }
 
         void release() {
-            if (pressed) send(false);
+            boolean hadPending = comboPending;
+            comboPending = false;
+            comboHandler.removeCallbacksAndMessages(comboToken);
+            if ((pressed || hadPending) && data.keycodes != null) sendNow(data.keycodes, false);
             pressed = false;
             toggled = false;
             refreshState();
@@ -724,10 +753,49 @@ final class PojavControlOverlay extends ViewGroup {
         }
 
         // Satu tombol layar bisa menggerakkan beberapa tombol sekaligus:
-        // ditekan berurutan, dilepas dengan urutan terbalik.
+        // ditekan berurutan, dilepas dengan urutan terbalik. Kalau "jeda antar tombol" > 0,
+        // tiap tombol berikutnya ditekan/dilepas setelah jeda itu (berguna untuk
+        // kombinasi seperti pilih slot hotbar lalu klik kanan).
         private void send(boolean down) {
             int[] codes = data.keycodes;
             if (codes == null) return;
+            int delay = ControlSettings.comboDelayMs(getContext());
+            if (delay <= 0 || codes.length <= 1) {
+                sendNow(codes, down);
+                return;
+            }
+            long now = SystemClock.uptimeMillis();
+            if (down) {
+                comboPressStart = now;
+                for (int i = 0; i < codes.length; i++) {
+                    final int code = codes[i];
+                    if (i == 0) sendCode(code, true);
+                    else comboHandler.postAtTime(() -> sendCode(code, true), comboToken,
+                            now + (long) i * delay);
+                }
+                markComboPending(now + (long) codes.length * delay + 1L);
+            } else {
+                long pressesDoneAt = comboPressStart + (long) (codes.length - 1) * delay;
+                long start = Math.max(now, pressesDoneAt + 1L);
+                int step = 0;
+                for (int i = codes.length - 1; i >= 0; i--) {
+                    final int code = codes[i];
+                    comboHandler.postAtTime(() -> sendCode(code, false), comboToken,
+                            start + (long) step * delay);
+                    step++;
+                }
+                markComboPending(start + (long) step * delay + 1L);
+            }
+        }
+
+        // Menandai ada tombol gabungan yang masih menunggu jadwal, supaya release() paksa
+        // tetap melepas semuanya (tidak ada tombol game yang nyangkut).
+        private void markComboPending(long clearAt) {
+            comboPending = true;
+            comboHandler.postAtTime(() -> comboPending = false, comboToken, clearAt);
+        }
+
+        private void sendNow(int[] codes, boolean down) {
             if (down) {
                 for (int i = 0; i < codes.length; i++) sendCode(codes[i], true);
             } else {
