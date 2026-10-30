@@ -25,7 +25,9 @@
     <string name="pojav_controls_cursor_speed">Cursor speed: %1$d%%</string>
     <string name="pojav_controls_cursor_size">Cursor size: %1$d%%</string>
     <string name="pojav_controls_combo_delay">Delay between keys in a combo: %1$d ms</string>
-    <string name="pojav_controls_cursor_in_menus">Show cursor only in menus (inventory, settings), never in game</string>
+    <string name="pojav_controls_cursor_in_menus">Use virtual cursor in menus (off = touch items directly)</string>
+    <string name="pojav_controls_min_hold">Minimum click hold: %1$d ms (raise if hits are dropped)</string>
+    <string name="pojav_controls_sequence">Sequence (tap the keys one by one, in order)</string>
     <string name="pojav_controls_hide_in_menu">Hide controls while a menu is open (inventory, settings)</string>
     <string name="pojav_controls_position_x">X expression</string>
     <string name="pojav_controls_position_y">Y expression</string>
