@@ -294,6 +294,7 @@ final class PojavControlsEditorView extends FrameLayout {
         EditText radius = field(form, R.string.pojav_controls_corner_radius,
                 Float.toString(target.data.cornerRadius));
         CheckBox toggle = check(form, R.string.pojav_controls_toggle, target.data.isToggle);
+        CheckBox sequence = check(form, R.string.pojav_controls_sequence, target.data.sequence);
         CheckBox swipeable = check(form, R.string.pojav_controls_swipeable, target.data.isSwipeable);
         CheckBox passThrough = check(form, R.string.pojav_controls_pass_through, target.data.passThruEnabled);
         CheckBox inGame = check(form, R.string.pojav_controls_in_game, target.data.displayInGame);
@@ -356,6 +357,7 @@ final class PojavControlsEditorView extends FrameLayout {
                     target.data.strokeWidth = number(strokeWidth, target.data.strokeWidth);
                     target.data.cornerRadius = number(radius, target.data.cornerRadius);
                     target.data.isToggle = toggle.isChecked();
+                    target.data.sequence = sequence.isChecked();
                     target.data.isSwipeable = swipeable.isChecked();
                     target.data.passThruEnabled = passThrough.isChecked();
                     target.data.displayInGame = inGame.isChecked();
@@ -481,6 +483,10 @@ final class PojavControlsEditorView extends FrameLayout {
                 ControlSettings.COMBO_DELAY_MIN, ControlSettings.COMBO_DELAY_MAX,
                 ControlSettings.comboDelayMs(activity), false);
 
+        SeekBar minHoldBar = addSlider(form, R.string.pojav_controls_min_hold,
+                ControlSettings.MIN_HOLD_MIN, ControlSettings.MIN_HOLD_MAX,
+                ControlSettings.minHoldMs(activity), false);
+
         CheckBox hideInMenu = new CheckBox(activity);
         hideInMenu.setText(R.string.pojav_controls_hide_in_menu);
         hideInMenu.setChecked(ControlSettings.hideInMenu(activity));
@@ -509,6 +515,8 @@ final class PojavControlsEditorView extends FrameLayout {
                             cursorSizeBar.getProgress() + ControlSettings.CURSOR_SIZE_MIN);
                     ControlSettings.setComboDelayMs(activity,
                             comboDelayBar.getProgress() + ControlSettings.COMBO_DELAY_MIN);
+                    ControlSettings.setMinHoldMs(activity,
+                            minHoldBar.getProgress() + ControlSettings.MIN_HOLD_MIN);
                     ControlSettings.setHideInMenu(activity, hideInMenu.isChecked());
                     ControlSettings.setCursorInMenus(activity, cursorInMenus.isChecked());
                     Toast.makeText(activity, R.string.pojav_controls_saved, Toast.LENGTH_SHORT).show();

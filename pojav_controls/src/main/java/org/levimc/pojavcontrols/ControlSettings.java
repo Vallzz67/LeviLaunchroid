@@ -17,6 +17,9 @@ final class ControlSettings {
     static final int COMBO_DELAY_MIN = 0;
     static final int COMBO_DELAY_MAX = 200;
     static final int COMBO_DELAY_DEFAULT = 0;
+    static final int MIN_HOLD_MIN = 0;
+    static final int MIN_HOLD_MAX = 150;
+    static final int MIN_HOLD_DEFAULT = 50;
 
     private static final String PREFS = "pojav_controls_settings";
     private static final String KEY_SENS = "look_sensitivity_percent";
@@ -24,13 +27,15 @@ final class ControlSettings {
     private static final String KEY_CURSOR = "cursor_speed_percent";
     private static final String KEY_CURSOR_SIZE = "cursor_size_percent";
     private static final String KEY_COMBO_DELAY = "combo_delay_ms";
-    private static final String KEY_CURSOR_IN_MENUS = "cursor_in_menus";
+    private static final String KEY_CURSOR_IN_MENUS = "cursor_in_menus_v2";
+    private static final String KEY_MIN_HOLD = "min_click_hold_ms";
 
     private static volatile int sensitivityPercent = -1;
     private static volatile int cursorSpeedPercent = -1;
     private static volatile int cursorSizePercent = -1;
     private static volatile int comboDelayMs = -1;
     private static volatile int cursorInMenus = -1;  // -1 = belum dibaca
+    private static volatile int minHoldMs = -1;
     private static volatile int hideInMenu = -1;  // -1 = belum dibaca, 0 = tidak, 1 = ya
 
     private ControlSettings() {}
@@ -116,13 +121,13 @@ final class ControlSettings {
     }
 
     /**
-     * Kalau aktif (bawaan), kursor virtual otomatis muncul dan dipakai saat menu/inventory/pengaturan
-     * terbuka, dan tidak pernah muncul di dalam game.
+     * Kalau aktif, kursor virtual muncul dan dipakai saat menu/inventory/pengaturan terbuka
+     * (tidak pernah di dalam game). Kalau mati (bawaan), item di menu disentuh langsung.
      */
     static boolean cursorInMenus(Context context) {
         int cached = cursorInMenus;
         if (cached >= 0) return cached == 1;
-        boolean loaded = prefs(context).getBoolean(KEY_CURSOR_IN_MENUS, true);
+        boolean loaded = prefs(context).getBoolean(KEY_CURSOR_IN_MENUS, false);
         cursorInMenus = loaded ? 1 : 0;
         return loaded;
     }
@@ -130,6 +135,22 @@ final class ControlSettings {
     static void setCursorInMenus(Context context, boolean enabled) {
         cursorInMenus = enabled ? 1 : 0;
         prefs(context).edit().putBoolean(KEY_CURSOR_IN_MENUS, enabled).apply();
+    }
+
+    /** Lama minimum (ms) sebuah klik/tombol ditahan sebelum dilepas, supaya game tidak melewatkannya. */
+    static int minHoldMs(Context context) {
+        int cached = minHoldMs;
+        if (cached >= 0) return cached;
+        int loaded = Math.max(MIN_HOLD_MIN, Math.min(MIN_HOLD_MAX,
+                prefs(context).getInt(KEY_MIN_HOLD, MIN_HOLD_DEFAULT)));
+        minHoldMs = loaded;
+        return loaded;
+    }
+
+    static void setMinHoldMs(Context context, int ms) {
+        int value = Math.max(MIN_HOLD_MIN, Math.min(MIN_HOLD_MAX, ms));
+        minHoldMs = value;
+        prefs(context).edit().putInt(KEY_MIN_HOLD, value).apply();
     }
 
     /** Kalau aktif, semua tombol disembunyikan dan sentuhan diteruskan langsung ke game saat menu terbuka. */

@@ -23,6 +23,8 @@ public class ControlData {
     public String dynamicX;
     public String dynamicY;
     public boolean isToggle;
+    /** Kalau true, tombol-tombol dalam satu tombol layar diketuk satu per satu secara berurutan. */
+    public boolean sequence;
     public boolean passThruEnabled;
     public String name;
     public int[] keycodes;
@@ -49,6 +51,7 @@ public class ControlData {
         this.width = width;
         this.height = height;
         isToggle = false;
+        sequence = false;
         passThruEnabled = false;
         opacity = 1f;
         bgColor = 0x4D000000;
@@ -64,6 +67,7 @@ public class ControlData {
         dynamicX = source.dynamicX;
         dynamicY = source.dynamicY;
         isToggle = source.isToggle;
+        sequence = source.sequence;
         passThruEnabled = source.passThruEnabled;
         name = source.name;
         keycodes = inflateKeycodes(source.keycodes);

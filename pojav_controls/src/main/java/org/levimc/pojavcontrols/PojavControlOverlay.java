@@ -56,7 +56,7 @@ final class PojavControlOverlay extends ViewGroup {
     PojavControlOverlay(Activity activity, PojavControlsHost host) {
         super(activity);
         this.activity = activity;
-        refHost = new RefCountedHost(host);
+        refHost = new RefCountedHost(host, activity);
         this.host = refHost;
         repository = new ControlRepository(activity);
         runtimeSurface = new RuntimeSurface(activity);
@@ -194,10 +194,9 @@ final class PojavControlOverlay extends ViewGroup {
     }
 
     // Kursor virtual HANYA aktif saat menu/inventory/pengaturan terbuka, dan tidak pernah
-    // di dalam game. Aktif kalau opsi "kursor di menu" menyala atau mode kursor dinyalakan tombol.
+    // di dalam game. Dikendalikan sepenuhnya oleh opsi "kursor di menu" di Settings.
     private boolean isCursorActive() {
-        return host.pojavIsMenuOpen()
-                && (virtualMouse || ControlSettings.cursorInMenus(activity));
+        return host.pojavIsMenuOpen() && ControlSettings.cursorInMenus(activity);
     }
 
     private void setVirtualMouse(boolean enabled) {
@@ -480,7 +479,7 @@ final class PojavControlOverlay extends ViewGroup {
             joystick.setVisibility(visible ? VISIBLE : GONE);
             if (!visible) joystick.release();
         }
-        boolean cursorActive = menu && (virtualMouse || ControlSettings.cursorInMenus(activity));
+        boolean cursorActive = menu && ControlSettings.cursorInMenus(activity);
         // Keluar dari menu saat kursor sedang "menahan klik": lepas supaya tidak nyangkut.
         if (!cursorActive && virtualTouchDown) releaseVirtualTouch();
         cursorView.setVisibility(cursorActive ? VISIBLE : GONE);
@@ -759,6 +758,11 @@ final class PojavControlOverlay extends ViewGroup {
         private void send(boolean down) {
             int[] codes = data.keycodes;
             if (codes == null) return;
+            if (data.sequence && codes.length > 1) {
+                // Mode urutan: tiap tombol diketuk satu per satu; melepas jari tidak melakukan apa-apa.
+                if (down) startSequence(codes);
+                return;
+            }
             int delay = ControlSettings.comboDelayMs(getContext());
             if (delay <= 0 || codes.length <= 1) {
                 sendNow(codes, down);
@@ -786,6 +790,27 @@ final class PojavControlOverlay extends ViewGroup {
                 }
                 markComboPending(start + (long) step * delay + 1L);
             }
+        }
+
+        // Mode urutan, mis. [slot ender pearl, klik kanan, slot wind charge, klik kanan]:
+        // tiap tombol ditekan lalu dilepas (lama tahan minimum), lalu jeda, lalu tombol berikutnya.
+        private void startSequence(int[] codes) {
+            if (comboPending) {  // ketukan baru saat urutan sebelumnya belum selesai
+                comboHandler.removeCallbacksAndMessages(comboToken);
+                comboPending = false;
+                sendNow(codes, false);
+            }
+            int hold = Math.max(ControlSettings.minHoldMs(getContext()), 40);
+            int gap = Math.max(ControlSettings.comboDelayMs(getContext()), 60);
+            long t = SystemClock.uptimeMillis();
+            for (int i = 0; i < codes.length; i++) {
+                final int code = codes[i];
+                if (i == 0) sendCode(code, true);
+                else comboHandler.postAtTime(() -> sendCode(code, true), comboToken, t);
+                comboHandler.postAtTime(() -> sendCode(code, false), comboToken, t + hold);
+                t += hold + gap;
+            }
+            markComboPending(t);
         }
 
         // Menandai ada tombol gabungan yang masih menunggu jadwal, supaya release() paksa
