@@ -45,6 +45,7 @@ final class PojavControlOverlay extends ViewGroup {
     private long virtualTouchDownAt;
     private boolean receiverRegistered;
     private float appliedCursorScale = -1f;
+    private final Paint guidePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final BroadcastReceiver profileReceiver = new BroadcastReceiver() {
         @Override
@@ -180,7 +181,58 @@ final class PojavControlOverlay extends ViewGroup {
     protected void dispatchDraw(Canvas canvas) {
         updateVisibility();
         super.dispatchDraw(canvas);
-        postInvalidateDelayed(250);
+        if (ControlSettings.showHotbarGuide(activity) && !host.pojavIsMenuOpen()) {
+            float[] r = hotbarRect();
+            guidePaint.setStyle(Paint.Style.STROKE);
+            guidePaint.setStrokeWidth(3f * getResources().getDisplayMetrics().density);
+            guidePaint.setColor(Color.argb(200, 255, 220, 0));
+            canvas.drawRect(r[0], r[1], r[2], r[3], guidePaint);
+        }
+        postInvalidateDelayed(80);
+    }
+
+    // Area hotbar: kotak di bawah-tengah layar (kiri, atas, kanan, bawah).
+    private float[] hotbarRect() {
+        float w = getWidth() * ControlSettings.hotbarWidthPercent(activity) / 100f;
+        float h = getHeight() * ControlSettings.hotbarHeightPercent(activity) / 100f;
+        float left = (getWidth() - w) / 2f;
+        return new float[]{left, getHeight() - h, left + w, getHeight()};
+    }
+
+    private boolean hitsVisibleControl(float x, float y) {
+        for (RuntimeButton button : buttons) {
+            if (button.getVisibility() == VISIBLE && x >= button.getLeft() && x <= button.getRight()
+                    && y >= button.getTop() && y <= button.getBottom()) return true;
+        }
+        for (RuntimeJoystick joystick : joysticks) {
+            if (joystick.getVisibility() == VISIBLE && x >= joystick.getLeft() && x <= joystick.getRight()
+                    && y >= joystick.getTop() && y <= joystick.getBottom()) return true;
+        }
+        return false;
+    }
+
+    // Sentuhan yang TIDAK boleh diambil overlay dibiarkan jatuh langsung ke game (seperti tanpa
+    // Pojav Controls), jadi tanpa salinan atau jeda tambahan:
+    //  - di menu/inventory saat kursor virtual mati, kecuali yang mengenai tombol yang terlihat;
+    //  - di dalam game, sentuhan yang mulai di area hotbar (agar hotbar bisa diketuk langsung).
+    private boolean shouldPassToGame(float x, float y) {
+        if (host.pojavIsMenuOpen()) {
+            if (ControlSettings.cursorInMenus(activity)) return false;
+            return !hitsVisibleControl(x, y);
+        }
+        if (!ControlSettings.hotbarPassThrough(activity)) return false;
+        float[] r = hotbarRect();
+        if (x < r[0] || x > r[2] || y < r[1] || y > r[3]) return false;
+        return !hitsVisibleControl(x, y);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            updateVisibility();  // keadaan menu/tombol terbaru sebelum menentukan siapa yang menangani
+            if (shouldPassToGame(event.getX(), event.getY())) return false;
+        }
+        return super.dispatchTouchEvent(event);
     }
 
     private float cameraSensitivity() {
@@ -379,7 +431,7 @@ final class PojavControlOverlay extends ViewGroup {
         final float y = virtualCursorY;
         sendVirtualTouchAt(MotionEvent.ACTION_DOWN, downAt, downAt, x, y);
         postDelayed(() -> sendVirtualTouchAt(MotionEvent.ACTION_UP, downAt,
-                SystemClock.uptimeMillis(), x, y), 45L);
+                SystemClock.uptimeMillis(), x, y), 25L);
     }
 
     private void setVirtualTouchPressed(boolean down) {

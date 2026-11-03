@@ -487,6 +487,23 @@ final class PojavControlsEditorView extends FrameLayout {
                 ControlSettings.MIN_HOLD_MIN, ControlSettings.MIN_HOLD_MAX,
                 ControlSettings.minHoldMs(activity), false);
 
+        SeekBar hotbarWidthBar = addSlider(form, R.string.pojav_controls_hotbar_width,
+                ControlSettings.HOTBAR_W_MIN, ControlSettings.HOTBAR_W_MAX,
+                ControlSettings.hotbarWidthPercent(activity), false);
+        SeekBar hotbarHeightBar = addSlider(form, R.string.pojav_controls_hotbar_height,
+                ControlSettings.HOTBAR_H_MIN, ControlSettings.HOTBAR_H_MAX,
+                ControlSettings.hotbarHeightPercent(activity), false);
+
+        CheckBox hotbarPass = new CheckBox(activity);
+        hotbarPass.setText(R.string.pojav_controls_hotbar_pass);
+        hotbarPass.setChecked(ControlSettings.hotbarPassThrough(activity));
+        form.addView(hotbarPass);
+
+        CheckBox hotbarGuide = new CheckBox(activity);
+        hotbarGuide.setText(R.string.pojav_controls_hotbar_guide);
+        hotbarGuide.setChecked(ControlSettings.showHotbarGuide(activity));
+        form.addView(hotbarGuide);
+
         CheckBox hideInMenu = new CheckBox(activity);
         hideInMenu.setText(R.string.pojav_controls_hide_in_menu);
         hideInMenu.setChecked(ControlSettings.hideInMenu(activity));
@@ -517,6 +534,12 @@ final class PojavControlsEditorView extends FrameLayout {
                             comboDelayBar.getProgress() + ControlSettings.COMBO_DELAY_MIN);
                     ControlSettings.setMinHoldMs(activity,
                             minHoldBar.getProgress() + ControlSettings.MIN_HOLD_MIN);
+                    ControlSettings.setHotbarWidthPercent(activity,
+                            hotbarWidthBar.getProgress() + ControlSettings.HOTBAR_W_MIN);
+                    ControlSettings.setHotbarHeightPercent(activity,
+                            hotbarHeightBar.getProgress() + ControlSettings.HOTBAR_H_MIN);
+                    ControlSettings.setHotbarPassThrough(activity, hotbarPass.isChecked());
+                    ControlSettings.setShowHotbarGuide(activity, hotbarGuide.isChecked());
                     ControlSettings.setHideInMenu(activity, hideInMenu.isChecked());
                     ControlSettings.setCursorInMenus(activity, cursorInMenus.isChecked());
                     Toast.makeText(activity, R.string.pojav_controls_saved, Toast.LENGTH_SHORT).show();

@@ -20,6 +20,12 @@ final class ControlSettings {
     static final int MIN_HOLD_MIN = 0;
     static final int MIN_HOLD_MAX = 150;
     static final int MIN_HOLD_DEFAULT = 50;
+    static final int HOTBAR_W_MIN = 15;
+    static final int HOTBAR_W_MAX = 100;
+    static final int HOTBAR_W_DEFAULT = 55;
+    static final int HOTBAR_H_MIN = 5;
+    static final int HOTBAR_H_MAX = 40;
+    static final int HOTBAR_H_DEFAULT = 16;
 
     private static final String PREFS = "pojav_controls_settings";
     private static final String KEY_SENS = "look_sensitivity_percent";
@@ -29,6 +35,10 @@ final class ControlSettings {
     private static final String KEY_COMBO_DELAY = "combo_delay_ms";
     private static final String KEY_CURSOR_IN_MENUS = "cursor_in_menus_v2";
     private static final String KEY_MIN_HOLD = "min_click_hold_ms";
+    private static final String KEY_HOTBAR_PASS = "hotbar_passthrough";
+    private static final String KEY_HOTBAR_W = "hotbar_w_percent";
+    private static final String KEY_HOTBAR_H = "hotbar_h_percent";
+    private static final String KEY_HOTBAR_GUIDE = "hotbar_guide";
 
     private static volatile int sensitivityPercent = -1;
     private static volatile int cursorSpeedPercent = -1;
@@ -36,6 +46,10 @@ final class ControlSettings {
     private static volatile int comboDelayMs = -1;
     private static volatile int cursorInMenus = -1;  // -1 = belum dibaca
     private static volatile int minHoldMs = -1;
+    private static volatile int hotbarPass = -1;
+    private static volatile int hotbarW = -1;
+    private static volatile int hotbarH = -1;
+    private static volatile int hotbarGuide = -1;
     private static volatile int hideInMenu = -1;  // -1 = belum dibaca, 0 = tidak, 1 = ya
 
     private ControlSettings() {}
@@ -151,6 +165,64 @@ final class ControlSettings {
         int value = Math.max(MIN_HOLD_MIN, Math.min(MIN_HOLD_MAX, ms));
         minHoldMs = value;
         prefs(context).edit().putInt(KEY_MIN_HOLD, value).apply();
+    }
+
+    /** Kalau aktif, sentuhan di area hotbar (bawah-tengah layar) di dalam game langsung ke game. */
+    static boolean hotbarPassThrough(Context context) {
+        int cached = hotbarPass;
+        if (cached >= 0) return cached == 1;
+        boolean loaded = prefs(context).getBoolean(KEY_HOTBAR_PASS, true);
+        hotbarPass = loaded ? 1 : 0;
+        return loaded;
+    }
+
+    static void setHotbarPassThrough(Context context, boolean enabled) {
+        hotbarPass = enabled ? 1 : 0;
+        prefs(context).edit().putBoolean(KEY_HOTBAR_PASS, enabled).apply();
+    }
+
+    static int hotbarWidthPercent(Context context) {
+        int cached = hotbarW;
+        if (cached >= 0) return cached;
+        int loaded = Math.max(HOTBAR_W_MIN, Math.min(HOTBAR_W_MAX,
+                prefs(context).getInt(KEY_HOTBAR_W, HOTBAR_W_DEFAULT)));
+        hotbarW = loaded;
+        return loaded;
+    }
+
+    static void setHotbarWidthPercent(Context context, int percent) {
+        int value = Math.max(HOTBAR_W_MIN, Math.min(HOTBAR_W_MAX, percent));
+        hotbarW = value;
+        prefs(context).edit().putInt(KEY_HOTBAR_W, value).apply();
+    }
+
+    static int hotbarHeightPercent(Context context) {
+        int cached = hotbarH;
+        if (cached >= 0) return cached;
+        int loaded = Math.max(HOTBAR_H_MIN, Math.min(HOTBAR_H_MAX,
+                prefs(context).getInt(KEY_HOTBAR_H, HOTBAR_H_DEFAULT)));
+        hotbarH = loaded;
+        return loaded;
+    }
+
+    static void setHotbarHeightPercent(Context context, int percent) {
+        int value = Math.max(HOTBAR_H_MIN, Math.min(HOTBAR_H_MAX, percent));
+        hotbarH = value;
+        prefs(context).edit().putInt(KEY_HOTBAR_H, value).apply();
+    }
+
+    /** Menampilkan kotak kuning area hotbar di dalam game, untuk membantu mengatur ukurannya. */
+    static boolean showHotbarGuide(Context context) {
+        int cached = hotbarGuide;
+        if (cached >= 0) return cached == 1;
+        boolean loaded = prefs(context).getBoolean(KEY_HOTBAR_GUIDE, false);
+        hotbarGuide = loaded ? 1 : 0;
+        return loaded;
+    }
+
+    static void setShowHotbarGuide(Context context, boolean show) {
+        hotbarGuide = show ? 1 : 0;
+        prefs(context).edit().putBoolean(KEY_HOTBAR_GUIDE, show).apply();
     }
 
     /** Kalau aktif, semua tombol disembunyikan dan sentuhan diteruskan langsung ke game saat menu terbuka. */
