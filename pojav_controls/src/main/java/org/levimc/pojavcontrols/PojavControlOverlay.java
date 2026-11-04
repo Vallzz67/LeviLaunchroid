@@ -45,6 +45,7 @@ final class PojavControlOverlay extends ViewGroup {
     private long virtualTouchDownAt;
     private boolean receiverRegistered;
     private float appliedCursorScale = -1f;
+    private int swallowedBits;  // jari (pointerId) yang sedang dipakai mengetuk hotbar
     private final Paint guidePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final BroadcastReceiver profileReceiver = new BroadcastReceiver() {
@@ -211,28 +212,66 @@ final class PojavControlOverlay extends ViewGroup {
         return false;
     }
 
-    // Sentuhan yang TIDAK boleh diambil overlay dibiarkan jatuh langsung ke game (seperti tanpa
-    // Pojav Controls), jadi tanpa salinan atau jeda tambahan:
-    //  - di menu/inventory saat kursor virtual mati, kecuali yang mengenai tombol yang terlihat;
-    //  - di dalam game, sentuhan yang mulai di area hotbar (agar hotbar bisa diketuk langsung).
-    private boolean shouldPassToGame(float x, float y) {
-        if (host.pojavIsMenuOpen()) {
-            if (ControlSettings.cursorInMenus(activity)) return false;
-            return !hitsVisibleControl(x, y);
-        }
-        if (!ControlSettings.hotbarPassThrough(activity)) return false;
+    // Menu/inventory saat kursor virtual mati: sentuhan dibiarkan jatuh langsung ke game
+    // (seperti tanpa Pojav Controls), kecuali yang mengenai tombol yang terlihat.
+    private boolean passMenuToGame(float x, float y) {
+        return host.pojavIsMenuOpen()
+                && !ControlSettings.cursorInMenus(activity)
+                && !hitsVisibleControl(x, y);
+    }
+
+    // Di dalam game: jari yang mulai di area hotbar (dan bukan di atas tombol) dianggap ketukan hotbar.
+    private boolean isHotbarTap(float x, float y) {
+        if (host.pojavIsMenuOpen() || !ControlSettings.hotbarPassThrough(activity)) return false;
         float[] r = hotbarRect();
         if (x < r[0] || x > r[2] || y < r[1] || y > r[3]) return false;
         return !hitsVisibleControl(x, y);
     }
 
+    // Ketukan hotbar dikirim ke game sebagai ketukan SINGKAT (tekan lalu lepas dalam ~30 ms),
+    // berapa pun lama jari menempel. Dengan begitu game tidak pernah melihat "tahan lama"
+    // (yang membuat item di hotbar terbuang) dan jari lain (kamera/tombol) tidak mengganggu.
+    private void sendHotbarTap(float x, float y) {
+        final long downAt = SystemClock.uptimeMillis();
+        sendVirtualTouchAt(MotionEvent.ACTION_DOWN, downAt, downAt, x, y);
+        postDelayed(() -> sendVirtualTouchAt(MotionEvent.ACTION_UP, downAt,
+                SystemClock.uptimeMillis(), x, y), 30L);
+    }
+
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             updateVisibility();  // keadaan menu/tombol terbaru sebelum menentukan siapa yang menangani
-            if (shouldPassToGame(event.getX(), event.getY())) return false;
+            int index = event.getActionIndex();
+            float x = event.getX(index);
+            float y = event.getY(index);
+            if (isHotbarTap(x, y)) {
+                swallowedBits |= 1 << event.getPointerId(index);
+                sendHotbarTap(x, y);
+            } else if (action == MotionEvent.ACTION_DOWN && swallowedBits == 0
+                    && passMenuToGame(x, y)) {
+                return false;
+            }
         }
-        return super.dispatchTouchEvent(event);
+        if (swallowedBits == 0) return super.dispatchTouchEvent(event);
+        if (action == MotionEvent.ACTION_CANCEL) {
+            swallowedBits = 0;
+            return super.dispatchTouchEvent(event);
+        }
+        // Jari hotbar dibuang dari event; jari lain (kamera, tombol) diproses seperti biasa.
+        MotionEvent filtered = PointerFilter.without(event, swallowedBits);
+        boolean handled = true;
+        if (filtered != null) {
+            handled = super.dispatchTouchEvent(filtered);
+            filtered.recycle();
+        }
+        if (action == MotionEvent.ACTION_UP) {
+            swallowedBits = 0;
+        } else if (action == MotionEvent.ACTION_POINTER_UP) {
+            swallowedBits &= ~(1 << event.getPointerId(event.getActionIndex()));
+        }
+        return handled;
     }
 
     private float cameraSensitivity() {
